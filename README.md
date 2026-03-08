@@ -109,7 +109,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 -- Make sure PostgreSQL is installed and running
 
-# Linux:
+### Linux:
 sudo systemctl start postgresql
 -- Create database and database user
 sudo -i -u postgres
