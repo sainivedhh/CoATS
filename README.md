@@ -70,22 +70,18 @@ Two system roles:
 ---
 
 # Project Structure
-CoATS/
-│
-├── backend/
-│ ├── accounts/
-│ ├── cases/
-│ ├── coats/
-│ ├── manage.py
-│ └── requirements.txt
-│
-├── frontend/
-│ ├── src/
-│ ├── components/
-│ ├── pages/
-│ └── package.json
-│
-└── README.md
+backend/
+- accounts/
+- cases/
+- coats/
+- manage.py
+- requirements.txt
+frontend/
+- src/
+- components/
+- pages/
+- package.json
+README.md
 
 
 ---
