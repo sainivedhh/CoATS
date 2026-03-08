@@ -107,18 +107,19 @@ pip install -r requirements.txt
 
 ### Linux:
 sudo systemctl start postgresql
--- Create database and database user
+**Create database and database user**
 sudo -i -u postgres
+
 psql
 CREATE DATABASE coats_db;
 CREATE USER coats_user WITH PASSWORD 'password';
 GRANT ALL PRIVILEGES ON DATABASE coats_db TO coats_user;
 
--- Exit PostgreSQL:
+**Exit PostgreSQL:**
 \q
 exit
 
--- Configure database in backend/coats/settings.py
+**Configure database in backend/coats/settings.py**
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -129,12 +130,12 @@ DATABASES = {
         'PORT': '5432',
     }
 }
--- Apply migrations
+**Apply migrations**
 python manage.py makemigrations
 python manage.py migrate
--- Create admin (supervisor) user
+**Create admin (supervisor) user**
 python manage.py createsuperuser
--- Run the backend server
+**Run the backend server**
 python manage.py runserver 8002
 
 ## Backend will run at:
