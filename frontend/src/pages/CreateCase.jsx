@@ -5,14 +5,14 @@ const THEMES = {
   dark: {
     bgBase: "#0b0e17", bgCard: "#141927", bgCardHover: "#1a2236",
     border: "#222d42", textPrimary: "#e2e8f5", textSecond: "#7b8db0",
-    textMuted: "#3d4f6e", accent: "#4f8ef7", green: "#34d399",
+    textMuted: "#637fae", accent: "#4f8ef7", green: "#34d399",
     red: "#f87171", yellow: "#f5c842",
     shadow: "0 4px 24px rgba(0,0,0,0.4)", toggleBg: "#1a2236",
   },
   light: {
     bgBase: "#eef2fb", bgCard: "#ffffff", bgCardHover: "#f5f8ff",
     border: "#d2ddf0", textPrimary: "#111827", textSecond: "#4b5e80",
-    textMuted: "#96a8c8", accent: "#2563eb", green: "#059669",
+    textMuted: "#434c5c", accent: "#2563eb", green: "#059669",
     red: "#dc2626", yellow: "#d97706",
     shadow: "0 4px 20px rgba(20,40,100,0.10)", toggleBg: "#e2e8f7",
   },
