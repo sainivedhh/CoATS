@@ -6,9 +6,6 @@ import {
   LineChart, Line,
 } from "recharts";
 
-// ─────────────────────────────────────────────────────────────────
-// API base — matches Django backend at localhost:8002
-// ─────────────────────────────────────────────────────────────────
 const BASE = "http://127.0.0.1:8002/api";
 
 async function apiFetch(path) {
@@ -20,9 +17,6 @@ async function apiFetch(path) {
   return res.json();
 }
 
-// ─────────────────────────────────────────────────────────────────
-// SEVERITY CONFIG — mirrors dashboard_views.py IPC_SEVERITY_MAP
-// ─────────────────────────────────────────────────────────────────
 const SEV = {
   Minor:          { color: "#60a5fa", label: "Minor",        ipcs: "279, 283, 290, 294, 341" },
   Bailable:       { color: "#34d399", label: "Bailable",     ipcs: "323, 336, 379, 420, 504" },
@@ -30,22 +24,11 @@ const SEV = {
   Heinous:        { color: "#f87171", label: "Heinous",       ipcs: "120B, 364A, 376A, 376D"  },
 };
 
-const STAGE_FULL = {
-  UI: "Under Investigation",
-  PT: "Pending Trial",
-  HC: "Pending before HC",
-  SC: "Pending before SC",
-  CC: "Closed",
-};
-
-// ─────────────────────────────────────────────────────────────────
-// THEMES
-// ─────────────────────────────────────────────────────────────────
 const THEMES = {
   dark: {
     bgBase: "#0b0e17", bgCard: "#141927", bgCardHover: "#1a2236",
     border: "#222d42", textPrimary: "#e2e8f5", textSecond: "#7b8db0",
-    textMuted: "#3d4f6e", accent: "#4f8ef7", green: "#34d399",
+    textMuted: "#637fae", accent: "#4f8ef7", green: "#34d399",
     red: "#f87171", yellow: "#f5c842", purple: "#a78bfa",
     chartGrid: "rgba(255,255,255,0.05)", shadow: "0 4px 24px rgba(0,0,0,0.4)",
     toggleBg: "#1a2236",
@@ -53,7 +36,7 @@ const THEMES = {
   light: {
     bgBase: "#eef2fb", bgCard: "#ffffff", bgCardHover: "#f5f8ff",
     border: "#d2ddf0", textPrimary: "#111827", textSecond: "#4b5e80",
-    textMuted: "#96a8c8", accent: "#2563eb", green: "#059669",
+    textMuted: "#434c5c", accent: "#2563eb", green: "#059669",
     red: "#dc2626", yellow: "#d97706", purple: "#7c3aed",
     chartGrid: "rgba(0,0,0,0.06)", shadow: "0 4px 20px rgba(20,40,100,0.10)",
     toggleBg: "#e2e8f7",
@@ -62,9 +45,28 @@ const THEMES = {
 
 const EMPTY_KPI = { total_cases: 0, active_cases: 0, closed_cases: 0, cases_this_month: 0 };
 
-// ─────────────────────────────────────────────────────────────────
-// SMALL COMPONENTS
-// ─────────────────────────────────────────────────────────────────
+// ── Reusable header button ────────────────────────────────────────
+function HeaderBtn({ children, onClick, t, accent, outline = false }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        fontFamily: "'JetBrains Mono',monospace", fontSize: "0.72rem",
+        fontWeight: 600, cursor: "pointer", borderRadius: 8,
+        padding: "6px 14px", transition: "all .2s",
+        background: outline ? "transparent" : hov ? accent : `${accent}18`,
+        border: `1px solid ${hov ? accent : outline ? t.border : `${accent}44`}`,
+        color: outline ? (hov ? t.red : t.textSecond) : (hov ? "#fff" : accent),
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function LiveDot({ color }) {
   return (
     <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: color, marginRight: 7, animation: "cPulse 2s infinite" }} />
@@ -119,7 +121,6 @@ function StatusBadge({ status, t }) {
 function KpiCard({ label, value, accent, icon, t }) {
   const [display, setDisplay] = useState(0);
   const prev = useRef(0);
-
   useEffect(() => {
     const diff = value - prev.current;
     if (diff === 0) return;
@@ -130,7 +131,6 @@ function KpiCard({ label, value, accent, icon, t }) {
     }, 28);
     return () => clearInterval(id);
   }, [value]);
-
   return (
     <div
       style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: 16, padding: "1.2rem 1.4rem", position: "relative", overflow: "hidden", boxShadow: t.shadow, transition: "background .25s, border-color .25s, transform .15s, box-shadow .15s", cursor: "default" }}
@@ -184,7 +184,7 @@ export default function COATSDashboard() {
   const [lastSync, setLastSync] = useState(null);
   const [flash, setFlash]       = useState(false);
   const prevTotal               = useRef(0);
-  const t = THEMES[theme];
+  const t      = THEMES[theme];
   const isDark = theme === "dark";
 
   const toggleTheme = useCallback(() => {
@@ -194,6 +194,9 @@ export default function COATSDashboard() {
       return next;
     });
   }, []);
+
+  // ── Navigate to all cases ──────────────────────────────────────
+  const handleViewAllCases = () => navigate("/cases");
 
   const handleLogout = () => {
     localStorage.clear();
@@ -208,14 +211,11 @@ export default function COATSDashboard() {
         apiFetch("/dashboard/timeline/"),
         apiFetch("/dashboard/recent-cases/"),
       ]);
-
-      // Flash toast when a new case is detected
       if (kpiData.total_cases > prevTotal.current && prevTotal.current !== 0) {
         setFlash(true);
         setTimeout(() => setFlash(false), 3500);
       }
       prevTotal.current = kpiData.total_cases;
-
       setKpi(kpiData);
       setSeverity(sevData);
       setTimeline(timeData);
@@ -240,7 +240,6 @@ export default function COATSDashboard() {
     return () => clearInterval(id);
   }, [loadDashboard]);
 
-  // Chart data
   const sevChartData = severity.map(s => ({
     name: s.severity, total: s.total,
     fill: SEV[s.severity]?.color || "#8896b3",
@@ -262,7 +261,7 @@ export default function COATSDashboard() {
 
       <div style={{ fontFamily: "'Sora',sans-serif", background: t.bgBase, color: t.textPrimary, minHeight: "100vh", padding: "2rem", transition: "background .25s, color .2s" }}>
 
-        {/* ── NEW CASE TOAST ── */}
+        {/* ── TOAST ── */}
         {flash && (
           <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, background: t.green, color: "#fff", padding: "10px 18px", borderRadius: 10, fontFamily: "'JetBrains Mono',monospace", fontSize: "0.82rem", boxShadow: `0 4px 20px ${t.green}66`, animation: "cSlide .3s ease", display: "flex", alignItems: "center", gap: 8 }}>
             🔔 New case filed and recorded
@@ -275,9 +274,7 @@ export default function COATSDashboard() {
             <div style={{ display: "flex", alignItems: "center", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.67rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.13em", marginBottom: 6 }}>
               <LiveDot color={loading ? t.yellow : t.green} />
               {loading ? "Connecting…" : "Live · Polls every 5s"}
-              {lastSync && !loading && (
-                <span style={{ marginLeft: 10 }}>· Synced {lastSync.toLocaleTimeString("en-IN")}</span>
-              )}
+              {lastSync && !loading && <span style={{ marginLeft: 10 }}>· Synced {lastSync.toLocaleTimeString("en-IN")}</span>}
             </div>
             <h1 style={{ fontSize: "1.65rem", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.2 }}>
               🚔 COATS Command Center
@@ -287,9 +284,11 @@ export default function COATSDashboard() {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {/* ── TOP-RIGHT CONTROLS ── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+
             {/* Theme toggle */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 2 }}>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.7rem", color: t.textSecond }}>{isDark ? "Dark" : "Light"}</span>
               <div onClick={toggleTheme} style={{ background: t.toggleBg, border: `1px solid ${t.border}`, borderRadius: 50, width: 62, height: 30, position: "relative", cursor: "pointer", transition: "background .25s" }}>
                 <div style={{ position: "absolute", width: 22, height: 22, borderRadius: "50%", background: t.accent, top: "50%", transform: `translateY(-50%) translateX(${isDark ? 4 : 36}px)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, transition: "transform .3s cubic-bezier(.34,1.56,.64,1)" }}>
@@ -298,13 +297,15 @@ export default function COATSDashboard() {
               </div>
             </div>
 
+            {/* ── VIEW ALL CASES BUTTON ── */}
+            <HeaderBtn onClick={handleViewAllCases} t={t} accent={t.purple}>
+              📋 All Cases
+            </HeaderBtn>
+
             {/* Logout */}
-            <button onClick={handleLogout} style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.72rem", background: "transparent", border: `1px solid ${t.border}`, color: t.textSecond, borderRadius: 8, padding: "6px 14px", cursor: "pointer", transition: "border-color .2s, color .2s" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = t.red; e.currentTarget.style.color = t.red; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.textSecond; }}
-            >
+            <HeaderBtn onClick={handleLogout} t={t} accent={t.red} outline>
               Logout
-            </button>
+            </HeaderBtn>
           </div>
         </div>
 
@@ -317,16 +318,14 @@ export default function COATSDashboard() {
 
         {/* ── KPI CARDS ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-          <KpiCard label="Total Cases"      value={kpi.total_cases}      accent={t.accent}  icon="📁" t={t} />
-          <KpiCard label="Active Cases"     value={kpi.active_cases}     accent={t.yellow}  icon="🔍" t={t} />
-          <KpiCard label="Closed Cases"     value={kpi.closed_cases}     accent={t.green}   icon="✅" t={t} />
-          <KpiCard label="Cases This Month" value={kpi.cases_this_month} accent={t.red}     icon="📅" t={t} />
+          <KpiCard label="Total Cases"      value={kpi.total_cases}      accent={t.accent} icon="📁" t={t} />
+          <KpiCard label="Active Cases"     value={kpi.active_cases}     accent={t.yellow} icon="🔍" t={t} />
+          <KpiCard label="Closed Cases"     value={kpi.closed_cases}     accent={t.green}  icon="✅" t={t} />
+          <KpiCard label="Cases This Month" value={kpi.cases_this_month} accent={t.red}    icon="📅" t={t} />
         </div>
 
         {/* ── CHARTS ROW ── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
-
-          {/* Severity Bar */}
           <Card t={t}>
             <SectionLabel t={t}>Cases by Severity — IPC Classification</SectionLabel>
             {sevChartData.length === 0 || sevChartData.every(d => d.total === 0) ? (
@@ -356,7 +355,6 @@ export default function COATSDashboard() {
             )}
           </Card>
 
-          {/* Monthly Timeline */}
           <Card t={t}>
             <SectionLabel t={t}>Monthly Filing Trend</SectionLabel>
             {timeData.length === 0 ? (
@@ -393,7 +391,22 @@ export default function COATSDashboard() {
                   <Pie data={sevChartData} dataKey="total" nameKey="name" cx="50%" cy="50%" innerRadius={52} outerRadius={78} paddingAngle={3} strokeWidth={0}>
                     {sevChartData.map((e, i) => <Cell key={i} fill={e.fill} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: 8, fontFamily: "'JetBrains Mono',monospace", fontSize: "0.78rem", color: t.textPrimary }} />
+                  <Tooltip
+  contentStyle={{
+    background: t.bgCard,
+    border: `1px solid ${t.border}`,
+    borderRadius: 10,
+    fontFamily: "'JetBrains Mono',monospace",
+    fontSize: "0.78rem",
+    color: t.textPrimary,
+    boxShadow: t.shadow,
+  }}
+  labelStyle={{ color: t.textMuted, marginBottom: 3 }}
+  formatter={(value, name) => [
+    <span style={{ color: t.accent, fontWeight: 700 }}>{value} cases</span>,
+    <span style={{ color: t.textSecond }}>{name}</span>,
+  ]}
+/>
                   <Legend formatter={v => <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.68rem", color: t.textSecond }}>{v}</span>} />
                 </PieChart>
               </ResponsiveContainer>
@@ -433,7 +446,17 @@ export default function COATSDashboard() {
 
         {/* ── RECENT CASES ── */}
         <Card t={t}>
-          <SectionLabel t={t}>Recently Filed Cases</SectionLabel>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+            <SectionLabel t={t}>Recently Filed Cases</SectionLabel>
+            {recent.length > 0 && (
+              <button
+                onClick={handleViewAllCases}
+                style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.68rem", background: "transparent", border: "none", color: t.accent, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: 0, marginBottom: "1rem" }}
+              >
+                View all →
+              </button>
+            )}
+          </div>
           {recent.length === 0 ? (
             <EmptyState t={t} msg={"No cases yet.\nNew cases appear here instantly when filed by Case Officers."} />
           ) : (
