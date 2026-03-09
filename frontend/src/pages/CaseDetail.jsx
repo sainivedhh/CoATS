@@ -134,7 +134,7 @@ function CaseDetail() {
     const token = localStorage.getItem("access");
     setSaving(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/cases/${id}/`, {
+      const res = await fetch(`http://127.0.0.1:8002/api/cases/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(form),
