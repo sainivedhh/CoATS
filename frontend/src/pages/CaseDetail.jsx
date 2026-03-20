@@ -112,6 +112,17 @@ function CaseDetail() {
   const [handoverErr, setHandoverErr]   = useState("");
   const [showHandover, setShowHandover] = useState(false);
 
+  // AI Similarity state
+  const [similarCases, setSimilarCases] = useState([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
+
+  // Assisting officer state
+  const [assistOfficerUsername, setAssistOfficerUsername] = useState("");
+  const [assigningAssist, setAssigningAssist] = useState(false);
+  const [assistMsg, setAssistMsg] = useState("");
+  const [assistErr, setAssistErr] = useState("");
+  const [showTeamManage, setShowTeamManage] = useState(false);
+
   const t      = THEMES[theme];
   const isDark = theme === "dark";
 
@@ -136,6 +147,14 @@ function CaseDetail() {
         });
       })
       .catch(err => setError(err.message));
+
+    // Fetch AI Match Suggestions
+    setLoadingSimilar(true);
+    fetch(`http://127.0.0.1:8002/api/cases/${id}/similar/`, { headers:{ Authorization:`Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => setSimilarCases(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setLoadingSimilar(false));
 
     if (role === "SUPERVISOR") {
       fetch("http://127.0.0.1:8002/api/officers/", { headers:{ Authorization:`Bearer ${token}` } })
@@ -216,6 +235,28 @@ function CaseDetail() {
     finally { setHandoverLoading(false); }
   };
 
+  const handleAssignAssistant = async () => {
+    if (!assistOfficerUsername) { setAssistErr("Select an officer."); return; }
+    setAssigningAssist(true); setAssistErr(""); setAssistMsg("");
+    try {
+      const res = await fetch(`http://127.0.0.1:8002/api/cases/${id}/assign-assistant/`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+        body: JSON.stringify({ username: assistOfficerUsername }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Assignment failed");
+      setAssistMsg(data.message);
+      setShowTeamManage(false);
+      setAssistOfficerUsername("");
+      
+      // Refresh case
+      const fresh = await fetch(`http://127.0.0.1:8002/api/cases/${id}/`, { headers:{ Authorization:`Bearer ${token}` } });
+      setCaseData(await fresh.json());
+    } catch (err) { setAssistErr(err.message); }
+    finally { setAssigningAssist(false); }
+  };
+
   return (
     <>
       <style>{`
@@ -292,11 +333,18 @@ function CaseDetail() {
                 <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.67rem", textTransform:"uppercase", letterSpacing:"0.12em", color:t.textMuted }}>
                   Officers · {caseData.all_officers_detail?.length || 0} involved
                 </div>
-                {role === "SUPERVISOR" && !isClosed && (
-                  <Btn onClick={()=>setShowHandover(v=>!v)} t={t} accent={t.yellow} small>
-                    {showHandover ? "✕ Cancel" : "🔄 Handover Case"}
-                  </Btn>
-                )}
+                <div style={{ display:"flex", gap:8 }}>
+                  {(role === "SUPERVISOR" || isCurrentHolder) && !isClosed && (
+                    <Btn onClick={()=>setShowTeamManage(v=>!v)} t={t} accent={t.purple} small outline={!showTeamManage}>
+                      {showTeamManage ? "✕ Cancel" : "+ Add Assistant"}
+                    </Btn>
+                  )}
+                  {role === "SUPERVISOR" && !isClosed && (
+                    <Btn onClick={()=>setShowHandover(v=>!v)} t={t} accent={t.yellow} small outline={!showHandover}>
+                      {showHandover ? "✕ Cancel" : "🔄 Handover Case"}
+                    </Btn>
+                  )}
+                </div>
               </div>
 
               {/* Officer pills */}
@@ -312,6 +360,35 @@ function CaseDetail() {
                   <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.75rem", color:t.textMuted, padding:"8px 0" }}>No officer assigned yet.</div>
                 )}
               </div>
+
+              {/* Add Assistant Panel */}
+              {showTeamManage && !isClosed && (
+                <div style={{ borderTop:`1px solid ${t.border}`, paddingTop:16, marginBottom:16, animation:"cFadeIn .25s ease" }}>
+                  <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.67rem", textTransform:"uppercase", letterSpacing:"0.1em", color:t.purple, marginBottom:10 }}>
+                    + Assign Assisting Officer
+                  </div>
+                  {assistErr && <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.72rem", color:t.red, marginBottom:8 }}>⚠ {assistErr}</div>}
+                  {assistMsg && <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.72rem", color:t.green, marginBottom:8 }}>✅ {assistMsg}</div>}
+
+                  <div style={{ display:"flex", gap:12, marginBottom:12 }}>
+                    <select value={assistOfficerUsername} onChange={e=>setAssistOfficerUsername(e.target.value)}
+                      style={{ flex:1, padding:"0.6rem 0.9rem", background:t.bgBase, border:`1px solid ${t.border}`, borderRadius:9, color:t.textPrimary, fontFamily:"'JetBrains Mono',monospace", fontSize:"0.8rem" }}>
+                      <option value="">— Select officer to assist —</option>
+                      {officers
+                        .filter(o => o.username !== caseData.current_officer_detail?.username && !(caseData.all_officers_detail||[]).some(a=>a.username===o.username))
+                        .map(o => (
+                          <option key={o.id} value={o.username}>
+                            {o.first_name ? `${o.first_name} ${o.last_name} (${o.username})` : o.username} · {o.branch}
+                          </option>
+                        ))
+                      }
+                    </select>
+                    <Btn onClick={handleAssignAssistant} t={t} accent={t.purple} disabled={assigningAssist||!assistOfficerUsername}>
+                      {assigningAssist ? "Adding…" : "Add to Team"}
+                    </Btn>
+                  </div>
+                </div>
+              )}
 
               {/* Handover panel */}
               {showHandover && role === "SUPERVISOR" && (
@@ -412,6 +489,41 @@ function CaseDetail() {
                 <Btn onClick={()=>navigate("/cases")} t={t} accent={t.accent} outline>← Back to Cases</Btn>
               </div>
             </div>
+
+            {/* AI SIMILAR CASES (MODUS OPERANDI) */}
+            <div style={{ marginTop:"1.5rem", background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:16, padding:"1.5rem", boxShadow:t.shadow }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:"1.25rem" }}>
+                <span style={{ fontSize:"1.2rem" }}>🧠</span>
+                <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.75rem", textTransform:"uppercase", letterSpacing:"0.12em", fontWeight:700, color:t.accent }}>AI Intelligence: Modus Operandi Matches</span>
+              </div>
+              
+              {loadingSimilar ? (
+                <div style={{ padding:"2rem", textAlign:"center", color:t.textMuted, fontFamily:"'JetBrains Mono',monospace", fontSize:"0.8rem" }}>
+                  <div style={{ animation:"cPulse 1.5s infinite" }}>Analyzing criminal patterns...</div>
+                </div>
+              ) : similarCases.length > 0 ? (
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(280px, 1fr))", gap:16 }}>
+                  {similarCases.map(sc => (
+                    <div key={sc.id} onClick={() => window.open(`/cases/${sc.id}`, "_blank")}
+                      style={{ background:t.bgBase, border:`1px solid ${t.border}`, borderRadius:12, padding:"1rem", cursor:"pointer", transition:"transform .2s", ":hover":{ transform:"translateY(-2px)" } }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.85rem", fontWeight:700, color:t.textPrimary }}>{sc.crime_number}</span>
+                        <span style={{ background:`${t.purple}1a`, color:t.purple, border:`1px solid ${t.purple}44`, padding:"3px 8px", borderRadius:20, fontSize:"0.65rem", fontWeight:700, textTransform:"uppercase" }}>
+                          {sc.match_score}% Match
+                        </span>
+                      </div>
+                      <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.7rem", color:t.textMuted, marginBottom:6 }}>{sc.section_of_law}</div>
+                      <div style={{ fontFamily:"'Sora',sans-serif", fontSize:"0.8rem", color:t.textSecond, lineHeight:1.5 }}>{sc.short_gist}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding:"2rem", textAlign:"center", color:t.textMuted, fontFamily:"'JetBrains Mono',monospace", fontSize:"0.8rem", border:`1px dashed ${t.border}`, borderRadius:12 }}>
+                  No similar historical cases strictly matched this Modus Operandi.
+                </div>
+              )}
+            </div>
+
           </div>
         )}
       </div>

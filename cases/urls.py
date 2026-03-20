@@ -4,7 +4,7 @@ from .views import (
     SupervisorCaseOverview, CaseLogListView,
     ChainOfCustodyView, ChainVerifyView,
     CaseHandoverView, CaseHandoverHistoryView,
-    CaseOfficersListView,
+    CaseOfficersListView, CaseSimilarityView, AddAssistingOfficerView,
     CaseProgressView, CaseProgressCheckView,
 )
 from .dashboard_views import (
@@ -20,6 +20,8 @@ urlpatterns = [
     path("cases/<uuid:pk>/handovers/",           CaseHandoverHistoryView.as_view()),
     path("cases/<uuid:pk>/custody/",             ChainOfCustodyView.as_view()),
     path("cases/<uuid:pk>/chain-verify/",        ChainVerifyView.as_view()),
+    path("cases/<uuid:pk>/similar/",             CaseSimilarityView.as_view()),
+    path("cases/<uuid:pk>/assign-assistant/",    AddAssistingOfficerView.as_view()),
 
     # Progress updation (from requirements doc)
     path("cases/<uuid:pk>/progress/",            CaseProgressView.as_view()),

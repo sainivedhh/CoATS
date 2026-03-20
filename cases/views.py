@@ -1,14 +1,18 @@
-from rest_framework import generics
+
+from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
+from django.db import transaction
 
-from .models import Case, CaseLog, CaseHandover
-from .serializers import CaseSerializer, CaseLogSerializer, CaseHandoverSerializer, OfficerMiniSerializer
+from .models import Case, CaseLog, CaseHandover, CaseProgress
+from .serializers import CaseSerializer, CaseLogSerializer, CaseHandoverSerializer, OfficerMiniSerializer, CaseProgressSerializer
 from .permissions import IsCaseOwner
+from .ai_classifier import compute_similar_cases
 
 User = get_user_model()
 
@@ -122,8 +126,6 @@ class CaseProgressView(APIView):
         except Case.DoesNotExist:
             return Response({"detail": "Case not found."}, status=404)
 
-        from .models import CaseProgress
-        from .serializers import CaseProgressSerializer
         entries = CaseProgress.objects.filter(case=case).order_by("-date_of_progress")
         return Response(CaseProgressSerializer(entries, many=True).data)
 
@@ -136,8 +138,6 @@ class CaseProgressView(APIView):
         if request.user.role != "CASE":
             raise PermissionDenied("Only Case Officers can add progress.")
 
-        from .models import CaseProgress
-        from .serializers import CaseProgressSerializer
         serializer = CaseProgressSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         progress = serializer.save(case=case, officer=request.user)
@@ -167,7 +167,6 @@ class CaseProgressCheckView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, pk):
-        from .models import CaseProgress
         try:
             progress = CaseProgress.objects.get(pk=pk)
         except CaseProgress.DoesNotExist:
@@ -183,19 +182,16 @@ class CaseProgressCheckView(APIView):
 
 # ── Case Handover ─────────────────────────────────────────────────
 class CaseHandoverView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
+        case = get_object_or_404(Case, pk=pk)
+
         if request.user.role != "SUPERVISOR":
             raise PermissionDenied("Only supervisors can authorize case handovers.")
 
-        try:
-            case = Case.objects.get(pk=pk)
-        except Case.DoesNotExist:
-            return Response({"detail": "Case not found."}, status=404)
-
         to_username = request.data.get("to_officer_username", "").strip()
-        reason      = request.data.get("reason", "").strip()
+        reason = request.data.get("reason", "").strip()
 
         if not to_username:
             raise ValidationError({"to_officer_username": "This field is required."})
@@ -209,36 +205,48 @@ class CaseHandoverView(APIView):
         if from_officer == to_officer:
             raise ValidationError({"to_officer_username": "Case is already assigned to this officer."})
 
-        case.current_officer = to_officer
-        case.case_holding_officer = to_officer
-        case.all_officers.add(to_officer)
-        case.save()
+        with transaction.atomic():
+            # Update case ownership
+            case.current_officer = to_officer
+            case.case_holding_officer = to_officer
 
-        handover = CaseHandover.objects.create(
-            case=case,
-            from_officer=from_officer,
-            to_officer=to_officer,
-            transferred_by=request.user,
-            reason=reason,
-        )
+            # Add the new officer to access list
+            case.all_officers.add(to_officer)
 
-        from_name = from_officer.username if from_officer else "unassigned"
-        log = CaseLog.objects.create(
-            case=case,
-            updated_by=request.user.username,
-            branch=getattr(request.user, "branch", ""),
-            field_changed="HANDOVER",
-            old_value=from_name,
-            new_value=to_officer.username,
-            ip_address=request.META.get('REMOTE_ADDR'),
-            user_agent=request.META.get('HTTP_USER_AGENT'),
-        )
-        print(f"🔗 Blockchain TX (HANDOVER): 0x{log.block_hash}")
+            # Access Revocation: Remove the old officer from access list if they are not the supervisor
+            # Supervisors retain access to all cases.
+            if from_officer and from_officer.role != "SUPERVISOR":
+                case.all_officers.remove(from_officer)
+
+            case.save()
+
+            # Create handover record
+            handover = CaseHandover.objects.create(
+                case=case,
+                from_officer=from_officer,
+                to_officer=to_officer,
+                transferred_by=request.user,
+                reason=reason,
+            )
+
+            # Create CaseLog entry for audit trail
+            from_name = from_officer.username if from_officer else "unassigned"
+            log = CaseLog.objects.create(
+                case=case,
+                updated_by=request.user.username,
+                branch=getattr(request.user, "branch", ""),
+                field_changed="HANDOVER",
+                old_value=from_name,
+                new_value=to_officer.username,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
+            )
+            print(f"🔗 Blockchain TX (HANDOVER): 0x{log.block_hash}")
 
         return Response({
             "detail": f"Case handed over from {from_name} to {to_officer.username}.",
             "handover": CaseHandoverSerializer(handover, context={"request": request}).data,
-        }, status=200)
+        }, status=status.HTTP_200_OK)
 
 
 # ── Handover history ──────────────────────────────────────────────
@@ -265,6 +273,96 @@ class CaseOfficersListView(APIView):
         officers = User.objects.filter(role="CASE").order_by("username")
         data = OfficerMiniSerializer(officers, many=True, context={"request": request}).data
         return Response(data)
+
+
+# ── AI Similar Case Matching View ──────────────────────────────────────────
+
+class CaseSimilarityView(APIView):
+    """
+    Computes Modus Operandi similarity across all cases using TF-IDF.
+    Strict Role-Based access to prevent intelligence leaks.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        case = get_object_or_404(Case, pk=pk)
+        
+        # Security Access Control
+        if request.user.role != 'SUPERVISOR' and request.user not in case.all_officers.all():
+            return Response({"error": "Unauthorized intelligence access."}, status=403)
+            
+        # Build document corpus
+        all_cases = Case.objects.filter(is_active=True).exclude(gist_of_case__isnull=True)
+        corpus_data = []
+        for c in all_cases:
+            if c.gist_of_case:
+                text = f"{c.section_of_law} {c.gist_of_case}"
+                corpus_data.append({"id": str(c.id), "text": text})
+                
+        # Perform Scikit-Learn Cosine Similarity
+        matches = compute_similar_cases(str(pk), corpus_data, top_n=3)
+        
+        response_data = []
+        for match in matches:
+            try:
+                mc = Case.objects.get(id=match['id'])
+                response_data.append({
+                    "id": str(mc.id),
+                    "crime_number": mc.crime_number,
+                    "section_of_law": mc.section_of_law,
+                    "match_score": match["match_score"],
+                    "short_gist": (mc.gist_of_case[:100] + "...") if mc.gist_of_case else ""
+                })
+            except Case.DoesNotExist:
+                continue
+                
+        return Response(response_data)
+
+
+# ── Add Assisting Officer View ──────────────────────────────────────────
+
+class AddAssistingOfficerView(APIView):
+    """
+    Allows a Supervisor or Lead Officer to add additional assisting 
+    officers to a case without doing a full handover.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        case = get_object_or_404(Case, pk=pk)
+        
+        # Security validation
+        if request.user.role != 'SUPERVISOR' and request.user != case.current_officer:
+            return Response({"error": "Only Supervisors or the Lead Officer can assign assistants."}, status=403)
+            
+        username = request.data.get('username')
+        if not username:
+            return Response({"error": "No username provided."}, status=400)
+            
+        User = get_user_model()
+        try:
+            new_officer = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response({"error": "Officer not found."}, status=404)
+            
+        if new_officer in case.all_officers.all():
+            return Response({"error": "Officer is already assigned to this case."}, status=400)
+            
+        case.all_officers.add(new_officer)
+        
+        # Audit Log
+        CaseLog.objects.create(
+            case=case,
+            updated_by=request.user.username,
+            branch=getattr(request.user, "branch", ""),
+            field_changed="ASSIGN_ASSISTANT",
+            old_value="None",
+            new_value=new_officer.username,
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT'),
+        )
+        
+        return Response({"message": f"Officer {new_officer.username} successfully assigned."})
 
 
 # ── Chain of Custody ──────────────────────────────────────────────

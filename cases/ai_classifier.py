@@ -1,5 +1,6 @@
 import re
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
@@ -79,3 +80,48 @@ def predict_severity(crime_description: str) -> tuple[str, int]:
         confidence = 50
         
     return str(prediction), confidence
+
+
+def compute_similar_cases(target_id: str, corpus_data: list, top_n: int = 3) -> list:
+    """
+    corpus_data: [{"id": "uuid1", "text": "gist..."}, ...]
+    Returns: [{"id": "uuid2", "match_score": 85}, ...]
+    """
+    if len(corpus_data) < 2:
+        return []
+        
+    target_idx = next((i for i, item in enumerate(corpus_data) if str(item["id"]) == str(target_id)), None)
+    if target_idx is None:
+        return []
+        
+    texts = [item["text"] for item in corpus_data]
+    vec = TfidfVectorizer(stop_words="english")
+    
+    try:
+        tfidf_matrix = vec.fit_transform(texts)
+    except:
+        return []
+        
+    # Compute similarity between target and all others
+    cos_sim = cosine_similarity(tfidf_matrix[target_idx:target_idx+1], tfidf_matrix).flatten()
+    
+    # Sort indices by score descending, excluding the target itself
+    related_indices = cos_sim.argsort()[::-1]
+    
+    results = []
+    for idx in related_indices:
+        if idx == target_idx:
+            continue
+        match_score = int(cos_sim[idx] * 100)
+        
+        # Only suggest meaningful algorithmic matches
+        if match_score > 0:
+            results.append({
+                "id": corpus_data[idx]["id"],
+                "match_score": match_score
+            })
+            
+        if len(results) >= top_n:
+            break
+            
+    return results
