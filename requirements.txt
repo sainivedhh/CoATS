@@ -1,0 +1,11 @@
+Django>=5.1,<6.0
+djangorestframework
+djangorestframework-simplejwt
+psycopg2-binary
+PyJWT
+django-cors-headers
+Pillow
+python-dotenv
+drf-spectacular
+scikit-learn
+numpy
