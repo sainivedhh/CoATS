@@ -19,10 +19,14 @@ class IsCaseOwner(BasePermission):
                 user in obj.all_officers.all()
             )
 
-        # Only current_officer can update (PATCH)
-        if request.method == "PATCH":
+        # Supervisors blocked in perform_update if needed, but here we allow
+        if request.method in ("PATCH", "POST", "PUT"):
             if user.role == "SUPERVISOR":
-                return True   # supervisors blocked in perform_update, not here
-            return obj.current_officer == user
+                return True
+            # Allow current officer or any assisting officially attached to the case
+            return (
+                obj.current_officer == user or
+                user in obj.all_officers.all()
+            )
 
         return False

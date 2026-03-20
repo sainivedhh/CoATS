@@ -91,10 +91,10 @@ function LogRow({ log, t, last, navigate, index }) {
         {/* Officer */}
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
           <div style={{ width: 26, height: 26, borderRadius: "50%", background: `${t.accent}22`, border: `1px solid ${t.accent}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", color: t.accent, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", flexShrink: 0 }}>
-            {(log.updated_by || "?")[0].toUpperCase()}
+            {(log.officer_name || log.updated_by || "?")[0].toUpperCase()}
           </div>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.78rem", color: t.textSecond }}>{log.updated_by}</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.78rem", color: t.textSecond }}>{log.officer_name || log.updated_by}</div>
             <div style={{ fontFamily: "'Sora',sans-serif", fontSize: "0.65rem", color: t.textMuted }}>Case Officer</div>
           </div>
         </div>
@@ -151,7 +151,7 @@ function LogRow({ log, t, last, navigate, index }) {
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: "2rem", marginTop: 4 }}>
             {[
               ["Crime No.",  log.crime_number],
-              ["Updated by", log.updated_by],
+              ["Updated by", log.officer_name || log.updated_by],
               ["Timestamp",  formatDate(log.timestamp)],
               ["Branch",     log.branch],
             ].map(([label, val]) => (
@@ -229,15 +229,15 @@ function CaseLogs() {
   }, [fetchLogs]);
 
   // Unique officers for filter dropdown
-  const officers = [...new Set(logs.map(l => l.updated_by).filter(Boolean))];
+  const officers = [...new Set(logs.map(l => l.officer_name || l.updated_by).filter(Boolean))];
 
   const filtered = logs.filter(l => {
     const matchField   = filterField === "ALL" || l.field_changed === filterField;
-    const matchOfficer = filterOfficer === "ALL" || l.updated_by === filterOfficer;
+    const matchOfficer = filterOfficer === "ALL" || (l.officer_name || l.updated_by) === filterOfficer;
     const q            = search.toLowerCase();
     const matchSearch  = !q
       || l.crime_number?.toLowerCase().includes(q)
-      || l.updated_by?.toLowerCase().includes(q)
+      || (l.officer_name || l.updated_by)?.toLowerCase().includes(q)
       || l.new_value?.toLowerCase().includes(q)
       || l.old_value?.toLowerCase().includes(q);
     return matchField && matchOfficer && matchSearch;

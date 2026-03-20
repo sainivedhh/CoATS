@@ -43,7 +43,7 @@ const THEMES = {
   },
 };
 
-const EMPTY_KPI = { total_cases: 0, active_cases: 0, closed_cases: 0, cases_this_month: 0 };
+const EMPTY_KPI = { total_cases: 0, ui_cases: 0, pt_cases: 0, hc_cases: 0, sc_cases: 0 };
 
 // ── Reusable header button ────────────────────────────────────────
 function HeaderBtn({ children, onClick, t, accent, outline = false }) {
@@ -185,6 +185,9 @@ export default function COATSDashboard() {
   const [flash, setFlash]       = useState(false);
   const [timelinePreset, setTimelinePreset] = useState("all");
   const [customDates, setCustomDates] = useState({ from: "", to: "" });
+  const [branchFilter, setBranchFilter] = useState("All");
+  const [progressMatrix, setProgressMatrix] = useState([]);
+  
   const prevTotal               = useRef(0);
   const t      = THEMES[theme];
   const isDark = theme === "dark";
@@ -224,21 +227,38 @@ export default function COATSDashboard() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [kpiData, sevData, timeData, recentData] = await Promise.all([
-        apiFetch("/dashboard/kpi/"),
-        apiFetch("/dashboard/by-severity/"),
-        apiFetch(`/dashboard/timeline/?${getTimelineParams()}`),
-        apiFetch("/dashboard/recent-cases/"),
-      ]);
+      const qBranch = `branch=${branchFilter}`;
+      const qTime = getTimelineParams();
+      
+      const reqs = [
+        apiFetch(`/dashboard/kpi/?${qBranch}`),
+        apiFetch(`/dashboard/by-severity/?${qBranch}`),
+        apiFetch(`/dashboard/timeline/?${qTime}&${qBranch}`),
+        apiFetch(`/dashboard/recent-cases/?${qBranch}`),
+      ];
+      
+      if (role === "SUPERVISOR") {
+         reqs.push(apiFetch(`/dashboard/progress-matrix/?${qTime}&${qBranch}`));
+      }
+
+      const results = await Promise.all(reqs);
+      
+      const kpiData = results[0];
       if (kpiData.total_cases > prevTotal.current && prevTotal.current !== 0) {
         setFlash(true);
         setTimeout(() => setFlash(false), 3500);
       }
       prevTotal.current = kpiData.total_cases;
+      
       setKpi(kpiData);
-      setSeverity(sevData);
-      setTimeline(timeData);
-      setRecent(recentData);
+      setSeverity(results[1]);
+      setTimeline(results[2]);
+      setRecent(results[3]);
+      
+      if (role === "SUPERVISOR" && results[4]) {
+          setProgressMatrix(results[4]);
+      }
+      
       setError(null);
       setLastSync(new Date());
       setLoading(false);
@@ -251,7 +271,7 @@ export default function COATSDashboard() {
         setLoading(false);
       }
     }
-  }, [navigate]);
+  }, [navigate, branchFilter, timelinePreset, customDates, role]);
 
   useEffect(() => {
     loadDashboard();
@@ -316,6 +336,21 @@ export default function COATSDashboard() {
               </div>
             </div>
 
+            {/* Branch Filter (Supervisors only) */}
+            {role === "SUPERVISOR" && (
+               <div style={{ display:"flex", alignItems:"center", gap:8, marginRight:12 }}>
+                 <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.65rem", color:t.textMuted, textTransform:"uppercase", letterSpacing:"0.1em" }}>Branch</span>
+                 <select value={branchFilter} onChange={e=>setBranchFilter(e.target.value)} 
+                   style={{ padding:"4px 8px", background:t.bgCard, border:`1px solid ${t.border}`, borderRadius:6, color:t.textPrimary, fontFamily:"'JetBrains Mono',monospace", fontSize:"0.75rem", outline:"none", cursor:"pointer" }}>
+                   <option value="All">All Offices</option>
+                   <option value="HQ">Headquarters (HQ)</option>
+                   <option value="CNI">Chennai</option>
+                   <option value="MDU">Madurai</option>
+                   <option value="CMB">Coimbatore</option>
+                 </select>
+               </div>
+            )}
+
             {/* ── VIEW ALL CASES BUTTON ── */}
             <HeaderBtn onClick={handleViewAllCases} t={t} accent={t.purple}>
               📋 All Cases
@@ -337,10 +372,10 @@ export default function COATSDashboard() {
 
         {/* ── KPI CARDS ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-          <KpiCard label="Total Cases"      value={kpi.total_cases}      accent={t.accent} icon="📁" t={t} />
-          <KpiCard label="Active Cases"     value={kpi.active_cases}     accent={t.yellow} icon="🔍" t={t} />
-          <KpiCard label="Closed Cases"     value={kpi.closed_cases}     accent={t.green}  icon="✅" t={t} />
-          <KpiCard label="Cases This Month" value={kpi.cases_this_month} accent={t.red}    icon="📅" t={t} />
+          <KpiCard label="Under Investigation" value={kpi.ui_cases} accent={t.yellow} icon="🔍" t={t} />
+          <KpiCard label="Pending Trial"       value={kpi.pt_cases} accent={t.purple} icon="⚖️" t={t} />
+          <KpiCard label="Pending High Court"  value={kpi.hc_cases} accent="#fb923c"  icon="🏛️" t={t} />
+          <KpiCard label="Pending Supreme Court" value={kpi.sc_cases} accent={t.red}  icon="⚖️" t={t} />
         </div>
 
         {/* ── CHARTS ROW ── */}
@@ -522,6 +557,44 @@ export default function COATSDashboard() {
             </table>
           )}
         </Card>
+
+        {/* ── SUPERVISORY PROGRESS MATRIX ── */}
+        {role === "SUPERVISOR" && (
+          <Card t={t} style={{ marginTop:"1.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+              <SectionLabel t={t}>Supervisory Progress Details ({timelinePreset})</SectionLabel>
+            </div>
+            {progressMatrix.length === 0 ? (
+              <EmptyState t={t} msg="No progress updations logged in this date range." />
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
+                <thead>
+                  <tr>
+                    {["Date", "Branch", "Crime No.", "Officer", "Progress Details", "Action To Be Taken (Active)"].map(h => (
+                      <th key={h} style={{ textAlign: "left", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.64rem", letterSpacing: "0.1em", textTransform: "uppercase", color: t.textMuted, padding: "0.45rem 0.75rem", borderBottom: `1px solid ${t.border}` }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {progressMatrix.map((p, i) => {
+                    const last = i === progressMatrix.length - 1;
+                    const td = { padding: "0.8rem 0.75rem", borderBottom: last ? "none" : `1px solid ${t.border}`, verticalAlign: "top" };
+                    return (
+                      <tr key={p.id} style={{ transition:"background .15s", cursor:"pointer", ":hover":{background:t.bgCardHover} }} onClick={() => navigate(`/cases/${p.id}/progress`)}>
+                        <td style={{ ...td, fontFamily:"'JetBrains Mono',monospace", fontSize:"0.72rem", color:t.textSecond, whiteSpace:"nowrap" }}>{p.date_of_progress}</td>
+                        <td style={{ ...td, fontFamily:"'JetBrains Mono',monospace", fontSize:"0.7rem", color:t.accent }}>{p.branch}</td>
+                        <td style={{ ...td, fontFamily:"'JetBrains Mono',monospace", fontSize:"0.8rem", fontWeight:700, color:t.purple }}>{p.crime_number}</td>
+                        <td style={{ ...td, fontFamily:"'Sora',sans-serif", fontSize:"0.75rem", color:t.textPrimary }}>{p.officer}</td>
+                        <td style={{ ...td, fontFamily:"'Sora',sans-serif", fontSize:"0.8rem", color:t.textPrimary, maxWidth:300, whiteSpace:"pre-wrap", lineHeight:1.5 }}>{p.details_of_progress}</td>
+                        <td style={{ ...td, fontFamily:"'Sora',sans-serif", fontSize:"0.75rem", color:t.red, fontWeight:600, maxWidth:200 }}>{p.action_to_be_taken || "None"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </Card>
+        )}
 
       </div>
     </>

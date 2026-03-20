@@ -99,12 +99,13 @@ class CaseLogSerializer(serializers.ModelSerializer):
     crime_number  = serializers.CharField(source="case.crime_number", read_only=True)
     case_id       = serializers.UUIDField(source="case.id",           read_only=True)
     officer_photo = serializers.SerializerMethodField()
+    officer_name  = serializers.SerializerMethodField()
 
     class Meta:
         model  = CaseLog
         fields = [
             "id", "case_id", "crime_number",
-            "updated_by", "officer_photo",
+            "updated_by", "officer_photo", "officer_name",
             "branch", "field_changed",
             "old_value", "new_value", "timestamp",
             "block_hash", "prev_hash", "block_index",
@@ -112,21 +113,36 @@ class CaseLogSerializer(serializers.ModelSerializer):
 
     def get_officer_photo(self, obj):
         return officer_photo_url(obj.updated_by, self.context.get("request"))
+        
+    def get_officer_name(self, obj):
+        try:
+            u = User.objects.get(username=obj.updated_by)
+            if u.first_name:
+                return f"{u.first_name} {u.last_name}".strip()
+        except User.DoesNotExist:
+            pass
+        return obj.updated_by
 
 
 class CaseProgressSerializer(serializers.ModelSerializer):
     officer_username = serializers.CharField(source="officer.username", read_only=True)
+    officer_name = serializers.SerializerMethodField()
     current_action   = serializers.SerializerMethodField()
 
     class Meta:
         model  = CaseProgress
         fields = [
-            "id", "case", "officer", "officer_username",
+            "id", "case", "officer", "officer_username", "officer_name",
             "date_of_progress", "details_of_progress",
             "reminder_date", "further_action_to_be_taken",
             "remarks", "is_completed", "current_action", "created_at",
         ]
-        read_only_fields = ["id", "case", "officer", "officer_username", "current_action", "created_at"]
+        read_only_fields = ["id", "case", "officer", "officer_username", "officer_name", "current_action", "created_at"]
 
     def get_current_action(self, obj):
         return obj.case.action_to_be_taken
+        
+    def get_officer_name(self, obj):
+        if obj.officer and obj.officer.first_name:
+            return f"{obj.officer.first_name} {obj.officer.last_name}".strip()
+        return obj.officer.username if obj.officer else "Unknown"

@@ -50,12 +50,11 @@ def get_severity_info(section_of_law: str):
 # ── 1. KPI endpoint ──────────────────────────────────────────────────────────
 class DashboardKPIView(APIView):
     """
-    GET /api/dashboard/kpi/
+    GET /api/dashboard/kpi/?branch=Chennai
     Returns:
       {
-        total_cases, active_cases, closed_cases, cases_this_month
+        total_cases, ui_cases, pt_cases, hc_cases, sc_cases 
       }
-    Only SUPERVISOR can access; Case Officers see their own slice.
     """
     permission_classes = [IsAuthenticated]
 
@@ -65,19 +64,19 @@ class DashboardKPIView(APIView):
         if user.role == "SUPERVISOR":
             qs = Case.objects.all()
         else:
-            qs = Case.objects.filter(case_holding_officer=user)
+            qs = Case.objects.filter(all_officers=user)
 
-        today = date.today()
+        branch = request.query_params.get("branch")
+        if branch and branch != "All":
+            qs = qs.filter(branch=branch)
+
         return Response({
-            "total_cases":       qs.count(),
-            "active_cases":      qs.filter(current_stage__in=ACTIVE_STAGES).count(),
-            "closed_cases":      qs.filter(current_stage=CLOSED_STAGE).count(),
-            "cases_this_month":  qs.filter(
-                                     date_of_registration__year=today.year,
-                                     date_of_registration__month=today.month,
-                                 ).count(),
+            "total_cases": qs.count(),
+            "ui_cases":    qs.filter(current_stage="UI").count(),
+            "pt_cases":    qs.filter(current_stage="PT").count(),
+            "hc_cases":    qs.filter(current_stage="HC").count(),
+            "sc_cases":    qs.filter(current_stage="SC").count(),
         })
-
 
 # ── 2. By-severity endpoint ───────────────────────────────────────────────────
 class DashboardBySeverityView(APIView):
@@ -100,7 +99,11 @@ class DashboardBySeverityView(APIView):
         if user.role == "SUPERVISOR":
             qs = Case.objects.all()
         else:
-            qs = Case.objects.filter(case_holding_officer=user)
+            qs = Case.objects.filter(all_officers=user)
+
+        branch = request.query_params.get("branch")
+        if branch and branch != "All":
+            qs = qs.filter(branch=branch)
 
         severity_counts = {"Minor": 0, "Bailable": 0, "Non-Bailable": 0, "Heinous": 0}
 
@@ -133,7 +136,11 @@ class DashboardTimelineView(APIView):
         if user.role == "SUPERVISOR":
             qs = Case.objects.all()
         else:
-            qs = Case.objects.filter(case_holding_officer=user)
+            qs = Case.objects.filter(all_officers=user)
+
+        branch = request.query_params.get("branch")
+        if branch and branch != "All":
+            qs = qs.filter(branch=branch)
 
         date_from = request.query_params.get("date_from")
         date_to   = request.query_params.get("date_to")
@@ -188,7 +195,11 @@ class DashboardRecentCasesView(APIView):
         if user.role == "SUPERVISOR":
             qs = Case.objects.all()
         else:
-            qs = Case.objects.filter(case_holding_officer=user)
+            qs = Case.objects.filter(all_officers=user)
+
+        branch = request.query_params.get("branch")
+        if branch and branch != "All":
+            qs = qs.filter(branch=branch)
 
         recent = qs.order_by("-date_of_registration", "-date_of_first_updation")[:10]
 
@@ -206,4 +217,47 @@ class DashboardRecentCasesView(APIView):
                 "date_of_registration":  c.date_of_registration.strftime("%Y-%m-%d"),
             })
 
+        return Response(data)
+
+# ── 5. Supervisory Progress Matrix ──────────────────────────────────────────
+class DashboardSupervisoryProgressView(APIView):
+    """
+    GET /api/dashboard/progress-matrix/?branch=...&date_from=...&date_to=...
+    Returns all Case Progress logs within a date range with Case details attached.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role != "SUPERVISOR":
+            return Response({"error": "Unauthorized feature"}, status=403)
+            
+        from .models import CaseProgress
+        qs = CaseProgress.objects.all().select_related("case")
+        
+        branch = request.query_params.get("branch")
+        if branch and branch != "All":
+            qs = qs.filter(case__branch=branch)
+            
+        date_from = request.query_params.get("date_from")
+        date_to   = request.query_params.get("date_to")
+        
+        if date_from:
+            qs = qs.filter(date_of_progress__gte=date_from)
+        if date_to:
+            qs = qs.filter(date_of_progress__lte=date_to)
+            
+        data = []
+        for p in qs.order_by("-date_of_progress"):
+            off_name = f"{p.officer.first_name} {p.officer.last_name}".strip() if p.officer and p.officer.first_name else (p.officer.username if p.officer else "Unknown")
+            data.append({
+                "id": p.id,
+                "crime_number": p.case.crime_number,
+                "branch": p.case.branch,
+                "date_of_progress": p.date_of_progress.strftime("%Y-%m-%d"),
+                "officer": off_name,
+                "details_of_progress": p.details_of_progress,
+                "action_to_be_taken": p.case.action_to_be_taken
+            })
+            
         return Response(data)

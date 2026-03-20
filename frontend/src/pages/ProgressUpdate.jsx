@@ -35,7 +35,7 @@ export default function ProgressUpdate() {
   const [theme, setTheme] = useState(getTheme);
   const [caseData, setCaseData] = useState(null);
   const [entries, setEntries] = useState([]);
-  const [form, setForm] = useState({ date_of_progress:"", details_of_progress:"", reminder_date:"", further_action_to_be_taken:"", remarks:"" });
+  const [form, setForm] = useState({ date_of_progress:"", details_of_progress:"", reminder_date:"", further_action_to_be_taken:"", remarks:"", action_completed:false });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -69,7 +69,7 @@ export default function ProgressUpdate() {
       const data = await res.json();
       if (!res.ok) throw new Error(JSON.stringify(data));
       setMsg("Progress saved successfully.");
-      setForm({ date_of_progress:"", details_of_progress:"", reminder_date:"", further_action_to_be_taken:"", remarks:"" });
+      setForm({ date_of_progress:"", details_of_progress:"", reminder_date:"", further_action_to_be_taken:"", remarks:"", action_completed:false });
       load();
     } catch(e) { setErr(e.message); }
     finally { setSaving(false); }
@@ -126,6 +126,16 @@ export default function ProgressUpdate() {
             <div style={{ marginBottom:"1rem" }}><Label text="Date of Progress *" t={t} />
               <input type="date" value={form.date_of_progress} onChange={e=>setForm({...form,date_of_progress:e.target.value})} style={inputStyle(t)} /></div>
 
+            {/* Checkbox for Action Completed */}
+            {caseData?.action_to_be_taken && (
+              <div style={{ marginBottom:"1.25rem", display:"flex", alignItems:"center", gap:10, background:form.action_completed?`${t.green}15`:t.bgBase, padding:"10px 14px", borderRadius:10, border:`1px solid ${form.action_completed?t.green:t.border}`, transition:"all .25s" }}>
+                <input type="checkbox" checked={form.action_completed} onChange={e=>setForm({...form, action_completed:e.target.checked})} style={{ width:18, height:18, cursor:"pointer", accentColor:t.green }} />
+                <div style={{ fontFamily:"'Sora',sans-serif", fontSize:"0.8rem", color:form.action_completed?t.green:t.textPrimary, transition:"color .2s", fontWeight:form.action_completed?600:400 }}>
+                  Mark Current Action "{caseData.action_to_be_taken}" as Completed?
+                </div>
+              </div>
+            )}
+
             <div style={{ marginBottom:"1rem" }}><Label text="Details of Progress *" t={t} />
               <textarea rows={3} value={form.details_of_progress} onChange={e=>setForm({...form,details_of_progress:e.target.value})} placeholder="Describe progress made..." style={{...inputStyle(t), resize:"vertical"}} /></div>
 
@@ -157,6 +167,9 @@ export default function ProgressUpdate() {
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
                     <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.7rem", color:entry.is_completed?t.green:t.accent }}>
                       {entry.is_completed?"✓ Completed":new Date(entry.date_of_progress).toLocaleDateString("en-IN")}
+                      <span style={{ color:t.textMuted, opacity:0.8, marginLeft:8 }}>
+                         · by {entry.officer_name || entry.officer_username}
+                      </span>
                     </div>
                     {!entry.is_completed && (
                       <button onClick={()=>markDone(entry.id)} style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.62rem", padding:"2px 8px", borderRadius:6, border:`1px solid ${t.green}44`, background:`${t.green}12`, color:t.green, cursor:"pointer" }}>

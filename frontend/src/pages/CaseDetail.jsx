@@ -162,9 +162,11 @@ function CaseDetail() {
     }
   }, [id]);
 
-  const isClosed = caseData?.current_stage === "CC";
-  const canEdit  = role === "CASE" && !isClosed;
-  const isCurrentHolder = caseData?.current_officer_detail?.username === localStorage.getItem("username");
+  const isClosed = caseData?.current_stage === "CLOSED";
+  const currentUser = localStorage.getItem("username");
+  const isAssignedOfficer = caseData?.all_officers_detail?.some(o => o.username === currentUser);
+  const canEdit  = role === "CASE" && isAssignedOfficer && !isClosed;
+  const isCurrentHolder = caseData?.current_officer_detail?.username === currentUser;
 
   const handleUpdate = async () => {
     setSaving(true);
@@ -228,7 +230,15 @@ function CaseDetail() {
       if (!res.ok) throw new Error(data.to_officer_username || data.detail || "Handover failed");
       setHandoverMsg(data.detail);
       setShowHandover(false);
-      // Refresh case
+      
+      if (role === "CASE") {
+          // If a case officer hands over a case, they lose all access to it instantly.
+          // Redirect them to the main cases list.
+          navigate("/cases");
+          return;
+      }
+      
+      // Refresh case (for supervisors who retain access)
       const fresh = await fetch(`http://127.0.0.1:8002/api/cases/${id}/`, { headers:{ Authorization:`Bearer ${token}` } });
       setCaseData(await fresh.json());
     } catch (err) { setHandoverErr(err.message); }
@@ -447,7 +457,7 @@ function CaseDetail() {
                 <span>Case Status & Action</span>
                 {isClosed && <span style={{ background:`${t.green}18`, color:t.green, border:`1px solid ${t.green}44`, borderRadius:20, padding:"2px 10px", fontSize:"0.68rem" }}>🔒 Closed — Read Only</span>}
                 {role === "SUPERVISOR" && !isClosed && <span style={{ background:`${t.yellow}18`, color:t.yellow, border:`1px solid ${t.yellow}44`, borderRadius:20, padding:"2px 10px", fontSize:"0.68rem" }}>👁 Supervisor View — Read Only</span>}
-                {role === "CASE" && !isCurrentHolder && !isClosed && <span style={{ background:`${t.red}18`, color:t.red, border:`1px solid ${t.red}44`, borderRadius:20, padding:"2px 10px", fontSize:"0.68rem" }}>⚠ You are not the current holder</span>}
+                {role === "CASE" && !isAssignedOfficer && !isClosed && <span style={{ background:`${t.red}18`, color:t.red, border:`1px solid ${t.red}44`, borderRadius:20, padding:"2px 10px", fontSize:"0.68rem" }}>⚠ You do not have edit access</span>}
               </div>
 
               <div style={{ marginBottom:"1.25rem" }}>
@@ -595,7 +605,7 @@ function CaseDetail() {
                   ) : reportProgress.map(p => (
                     <tr key={p.id}>
                       <td style={{ border:"1px solid #000", padding:"6px" }}>{p.date_of_progress}</td>
-                      <td style={{ border:"1px solid #000", padding:"6px" }}>{p.officer_username}</td>
+                      <td style={{ border:"1px solid #000", padding:"6px" }}>{p.officer_name || p.officer_username}</td>
                       <td style={{ border:"1px solid #000", padding:"6px", whiteSpace:"pre-wrap" }}>{p.details_of_progress}</td>
                     </tr>
                   ))}
@@ -608,7 +618,7 @@ function CaseDetail() {
           <div style={{ marginTop:"60px", display:"flex", justifyContent:"flex-end" }}>
             <div style={{ textAlign:"center", width:"250px" }}>
               <div style={{ borderBottom:"1px solid #000", marginBottom:"5px", height:"40px" }}></div>
-              <div><strong>{caseData?.current_officer_detail?.username || "Authorized Signatory"}</strong></div>
+              <div><strong>{caseData?.current_officer_detail?.first_name ? `${caseData.current_officer_detail.first_name} ${caseData.current_officer_detail.last_name}` : (caseData?.current_officer_detail?.username || "Authorized Signatory")}</strong></div>
               <div style={{ fontSize:"12px" }}>Case Holding Officer</div>
             </div>
           </div>

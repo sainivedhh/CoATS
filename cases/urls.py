@@ -10,6 +10,7 @@ from .views import (
 from .dashboard_views import (
     DashboardKPIView, DashboardBySeverityView,
     DashboardTimelineView, DashboardRecentCasesView,
+    DashboardSupervisoryProgressView,
 )
 
 urlpatterns = [
@@ -37,4 +38,5 @@ urlpatterns = [
     path("dashboard/by-severity/",               DashboardBySeverityView.as_view()),
     path("dashboard/timeline/",                  DashboardTimelineView.as_view()),
     path("dashboard/recent-cases/",              DashboardRecentCasesView.as_view()),
+    path("dashboard/progress-matrix/",           DashboardSupervisoryProgressView.as_view()),
 ]

@@ -142,18 +142,23 @@ class CaseProgressView(APIView):
         serializer.is_valid(raise_exception=True)
         progress = serializer.save(case=case, officer=request.user)
 
-        # When further_action_to_be_taken is filled, update case's action_to_be_taken
-        if progress.further_action_to_be_taken:
+        action_completed = request.data.get("action_completed", False)
+
+        # When action is marked completed, update case's action_to_be_taken
+        if action_completed:
             old_action = case.action_to_be_taken
-            case.action_to_be_taken = progress.further_action_to_be_taken
+            new_action = progress.further_action_to_be_taken or ""
+            case.action_to_be_taken = new_action
             case.save()
+            
+            from .models import CaseLog
             log = CaseLog.objects.create(
                 case=case,
                 updated_by=request.user.username,
                 branch=getattr(request.user, "branch", ""),
                 field_changed="action_to_be_taken",
                 old_value=old_action,
-                new_value=progress.further_action_to_be_taken,
+                new_value=new_action,
                 ip_address=request.META.get('REMOTE_ADDR'),
                 user_agent=request.META.get('HTTP_USER_AGENT'),
             )
@@ -292,7 +297,7 @@ class CaseSimilarityView(APIView):
             return Response({"error": "Unauthorized intelligence access."}, status=403)
             
         # Build document corpus
-        all_cases = Case.objects.filter(is_active=True).exclude(gist_of_case__isnull=True)
+        all_cases = Case.objects.exclude(gist_of_case__isnull=True).exclude(gist_of_case="")
         corpus_data = []
         for c in all_cases:
             if c.gist_of_case:
