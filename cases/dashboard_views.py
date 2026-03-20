@@ -33,18 +33,18 @@ CLOSED_STAGE  = "CC"
 def get_severity_info(section_of_law: str):
     """
     Determine severity from the section_of_law field.
-    Returns (severity_string, is_ai_predicted_boolean).
+    Returns (severity_string, is_ai_predicted_boolean, confidence_percentage).
     If it's in the hardcoded map, we use it directly.
     Otherwise, we use the local Machine Learning model.
     """
     s = section_of_law.strip().upper()
     for key, sev in IPC_SEVERITY_MAP.items():
         if key.upper() in s:
-            return sev, False
+            return sev, False, 100
             
     # AI Fallback!
-    predicted = predict_severity(section_of_law)
-    return predicted, True
+    predicted, confidence = predict_severity(section_of_law)
+    return predicted, True, confidence
 
 
 # ── 1. KPI endpoint ──────────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ class DashboardBySeverityView(APIView):
         severity_counts = {"Minor": 0, "Bailable": 0, "Non-Bailable": 0, "Heinous": 0}
 
         for section in qs.values_list("section_of_law", flat=True):
-            sev, _ = get_severity_info(section)
+            sev, is_ai, conf = get_severity_info(section)
             severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
         result = [
@@ -192,15 +192,18 @@ class DashboardRecentCasesView(APIView):
 
         recent = qs.order_by("-date_of_registration", "-date_of_first_updation")[:10]
 
-        return Response([
-            {
+        data = []
+        for c in recent:
+            sev, is_ai, conf = get_severity_info(c.section_of_law)
+            data.append({
                 "id":                    str(c.id),
                 "case_number":           c.crime_number,
                 "ipc_section":           c.section_of_law,
-                "severity":              get_severity_info(c.section_of_law)[0],
-                "is_ai_predicted":       get_severity_info(c.section_of_law)[1],
+                "severity":              sev,
+                "is_ai_predicted":       is_ai,
+                "ai_confidence":         conf,
                 "status":                self.STAGE_LABEL.get(c.current_stage, c.current_stage),
                 "date_of_registration":  c.date_of_registration.strftime("%Y-%m-%d"),
-            }
-            for c in recent
-        ])
+            })
+
+        return Response(data)

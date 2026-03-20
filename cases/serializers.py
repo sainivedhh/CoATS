@@ -49,6 +49,7 @@ class CaseSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         request = self.context.get("request")
+        
         if request:
             if instance.current_officer:
                 data["current_officer_detail"] = OfficerMiniSerializer(
@@ -57,6 +58,22 @@ class CaseSerializer(serializers.ModelSerializer):
             data["all_officers_detail"] = OfficerMiniSerializer(
                 instance.all_officers.all(), many=True, context={"request": request}
             ).data
+            
+            # Role-Based Data Redaction logic
+            if hasattr(request, "user") and request.user.is_authenticated:
+                user = request.user
+                is_supervisor = user.role == "SUPERVISOR"
+                is_assigned = user in instance.all_officers.all()
+                
+                if not is_supervisor and not is_assigned:
+                    redact_msg = "*** CLASSIFIED INTELLIGENCE - NEED TO KNOW ACCESS ONLY ***"
+                    for field in ["accused_details", "forensic_evidences", "major_improvements"]:
+                        if data.get(field):
+                            data[field] = redact_msg
+                    
+                    if data.get("gist_of_case"):
+                        data["gist_of_case"] = "Details classified. " + redact_msg
+
         return data
 
 

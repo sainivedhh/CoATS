@@ -91,6 +91,8 @@ class CaseDetailUpdateView(RetrieveUpdateAPIView):
                         field_changed=field,
                         old_value=str(old_val),
                         new_value=str(new_val),
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT'),
                     )
                     # Blockchain TX printed to Django console
                     print(f"🔗 Blockchain TX: 0x{log.block_hash}")
@@ -152,6 +154,8 @@ class CaseProgressView(APIView):
                 field_changed="action_to_be_taken",
                 old_value=old_action,
                 new_value=progress.further_action_to_be_taken,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT'),
             )
             print(f"🔗 Blockchain TX: 0x{log.block_hash}")
 
@@ -226,6 +230,8 @@ class CaseHandoverView(APIView):
             field_changed="HANDOVER",
             old_value=from_name,
             new_value=to_officer.username,
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT'),
         )
         print(f"🔗 Blockchain TX (HANDOVER): 0x{log.block_hash}")
 

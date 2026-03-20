@@ -55,17 +55,27 @@ y_train = [item[1] for item in TRAINING_DATA]
 ai_model = make_pipeline(TfidfVectorizer(ngram_range=(1, 2)), MultinomialNB())
 ai_model.fit(X_train, y_train)
 
-def predict_severity(crime_description: str) -> str:
+def predict_severity(crime_description: str) -> tuple[str, int]:
     """
     Predicts the severity of an unknown IPC section or crime description
     using the locally trained Scikit-Learn NLP model.
+    Returns: (predicted_severity, confidence_percentage)
     """
     if not crime_description or not isinstance(crime_description, str):
-        return "Non-Bailable"  # Safe default fallback
+        return "Non-Bailable", 0  # Safe default fallback
         
     # Basic text cleaning (lowercase, remove special chars)
     clean_text = re.sub(r'[^a-zA-Z0-9\s]', ' ', crime_description).lower()
     
     # Predict using the loaded model
     prediction = ai_model.predict([clean_text])[0]
-    return prediction
+    
+    # Extract Confidence Probability
+    try:
+        probs = ai_model.predict_proba([clean_text])[0]
+        class_idx = list(ai_model.classes_).index(prediction)
+        confidence = int(probs[class_idx] * 100)
+    except:
+        confidence = 50
+        
+    return str(prediction), confidence

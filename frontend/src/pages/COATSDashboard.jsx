@@ -549,8 +549,8 @@ function RecentRow({ c, t, last, navigate }) {
       <td style={td}>
         <SeverityBadge severity={c.severity} />
         {c.is_ai_predicted && (
-          <span title="Severity predicted by AI using Machine Learning" style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.purple, border: `1px solid ${t.purple}66`, borderRadius: 4, padding: "2px 5px", textTransform: "uppercase" }}>
-            ✨ AI Assessed
+          <span title={`Severity predicted by AI with ${c.ai_confidence}% precision`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.purple, border: `1px solid ${t.purple}66`, borderRadius: 4, padding: "2px 5px", textTransform: "uppercase" }}>
+            ✨ AI ({c.ai_confidence}%)
           </span>
         )}
       </td>

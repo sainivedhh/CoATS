@@ -104,6 +104,8 @@ class CaseLog(models.Model):
     old_value     = models.TextField(blank=True)
     new_value     = models.TextField(blank=True)
     timestamp     = models.DateTimeField(auto_now_add=True)
+    ip_address    = models.GenericIPAddressField(null=True, blank=True)
+    user_agent    = models.CharField(max_length=255, null=True, blank=True)
 
     # ── Blockchain fields ─────────────────────────────────────────
     block_hash  = models.CharField(max_length=64, blank=True, editable=False)
