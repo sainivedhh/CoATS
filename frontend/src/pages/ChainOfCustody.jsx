@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 const THEMES = {
   dark:  { bgBase:"#0b0e17", bgCard:"#141927", bgCardHover:"#1a2236", border:"#222d42", textPrimary:"#e2e8f5", textSecond:"#7b8db0", textMuted:"#3d4f6e", accent:"#4f8ef7", green:"#34d399", red:"#f87171", yellow:"#f5c842", purple:"#a78bfa", shadow:"0 4px 24px rgba(0,0,0,0.4)", toggleBg:"#1a2236" },
@@ -180,7 +180,6 @@ export default function ChainOfCustody() {
   };
 
   const { id }  = useParams();
-  const navigate = useNavigate();
   const [theme, setTheme]     = useState(getTheme);
   const [custody, setCustody] = useState(null);
   const [verify,  setVerify]  = useState(null);
@@ -198,7 +197,7 @@ export default function ChainOfCustody() {
 
   useEffect(() => {
     const token = localStorage.getItem("access");
-    if (!token) { navigate("/login", { replace:true }); return; }
+    if (!token) { window.location.replace("/login"); return; }
     const h = { Authorization:`Bearer ${token}` };
     const base = "http://127.0.0.1:8002/api";
     Promise.all([
