@@ -243,7 +243,7 @@ export default function ChainOfCustody() {
                 <div style={{ position:"absolute", width:22, height:22, borderRadius:"50%", background:t.accent, top:"50%", transform:`translateY(-50%) translateX(${isDark?4:36}px)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, transition:"transform .3s cubic-bezier(.34,1.56,.64,1)" }}>{isDark?"🌙":"☀️"}</div>
               </div>
             </div>
-            <button onClick={()=>navigate(`/cases/${id}`)} style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.72rem", fontWeight:600, cursor:"pointer", borderRadius:8, padding:"6px 14px", background:"transparent", border:`1px solid ${t.border}`, color:t.textSecond }}>← Case Detail</button>
+            <button onClick={()=>window.location.assign(`/cases/${id}`)} style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.72rem", fontWeight:600, cursor:"pointer", borderRadius:8, padding:"6px 14px", background:"transparent", border:`1px solid ${t.border}`, color:t.textSecond }}>← Case Detail</button>
           </div>
         </div>
 
