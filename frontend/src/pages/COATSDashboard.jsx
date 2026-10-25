@@ -278,8 +278,9 @@ export default function COATSDashboard() {
   }, [navigate, branchFilter, getTimelineParams, role]);
 
   useEffect(() => {
-    loadDashboard();
-    const id = setInterval(loadDashboard, 5000);
+    const id = setInterval(() => {
+      void loadDashboard();
+    }, 5000);
     return () => clearInterval(id);
   }, [loadDashboard]);
 
