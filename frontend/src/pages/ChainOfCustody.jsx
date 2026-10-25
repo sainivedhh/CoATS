@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 const THEMES = {
   dark:  { bgBase:"#0b0e17", bgCard:"#141927", bgCardHover:"#1a2236", border:"#222d42", textPrimary:"#e2e8f5", textSecond:"#7b8db0", textMuted:"#3d4f6e", accent:"#4f8ef7", green:"#34d399", red:"#f87171", yellow:"#f5c842", purple:"#a78bfa", shadow:"0 4px 24px rgba(0,0,0,0.4)", toggleBg:"#1a2236" },
@@ -40,27 +40,35 @@ function OfficerRosterCard({ officers, currentOfficer, t }) {
         👮 All Officers · {officers.length} involved
       </div>
       <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
-        {officers.map((o, i) => {
-          const isCurr = o.username === currentOfficer?.username;
-          const [err, setErr] = useState(false);
-          const displayName = o.first_name ? `${o.first_name} ${o.last_name}`.trim() : o.username;
-          return (
-            <div key={i} style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 12px", borderRadius:30, background:isCurr?`${t.accent}14`:`${t.purple}0a`, border:`1px solid ${isCurr?t.accent+"44":t.border}` }}>
-              <div style={{ width:28, height:28, borderRadius:"50%", overflow:"hidden", background:`${isCurr?t.accent:t.purple}22`, border:`2px solid ${isCurr?t.accent:t.purple}44`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                {o.photo_url && !err
-                  ? <img src={o.photo_url} alt={displayName} onError={()=>setErr(true)} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                  : <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.6rem", fontWeight:700, color:isCurr?t.accent:t.purple }}>{o.username.slice(0,2).toUpperCase()}</span>
-                }
-              </div>
-              <div>
-                <div style={{ fontFamily:"'Sora',sans-serif", fontSize:"0.78rem", fontWeight:600, color:t.textPrimary }}>{displayName}</div>
-                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.58rem", color:t.textMuted }}>
-                  {o.branch}{isCurr && <span style={{ color:t.accent }}> · Current</span>}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {officers.map((officer) => (
+          <OfficerRosterItem
+            key={officer.id ?? officer.username}
+            officer={officer}
+            isCurrent={officer.username === currentOfficer?.username}
+            t={t}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OfficerRosterItem({ officer: o, isCurrent: isCurr, t }) {
+  const [err, setErr] = useState(false);
+  const displayName = o.first_name ? `${o.first_name} ${o.last_name}`.trim() : o.username;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 12px", borderRadius:30, background:isCurr?`${t.accent}14`:`${t.purple}0a`, border:`1px solid ${isCurr?t.accent+"44":t.border}` }}>
+      <div style={{ width:28, height:28, borderRadius:"50%", overflow:"hidden", background:`${isCurr?t.accent:t.purple}22`, border:`2px solid ${isCurr?t.accent:t.purple}44`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        {o.photo_url && !err
+          ? <img src={o.photo_url} alt={displayName} onError={()=>setErr(true)} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+          : <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.6rem", fontWeight:700, color:isCurr?t.accent:t.purple }}>{o.username.slice(0,2).toUpperCase()}</span>
+        }
+      </div>
+      <div>
+        <div style={{ fontFamily:"'Sora',sans-serif", fontSize:"0.78rem", fontWeight:600, color:t.textPrimary }}>{displayName}</div>
+        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.58rem", color:t.textMuted }}>
+          {o.branch}{isCurr && <span style={{ color:t.accent }}> · Current</span>}
+        </div>
       </div>
     </div>
   );
@@ -172,7 +180,6 @@ export default function ChainOfCustody() {
   };
 
   const { id }  = useParams();
-  const navigate = useNavigate();
   const [theme, setTheme]     = useState(getTheme);
   const [custody, setCustody] = useState(null);
   const [verify,  setVerify]  = useState(null);
@@ -184,13 +191,13 @@ export default function ChainOfCustody() {
 
   const toggleTheme = () => setTheme(prev => {
     const next = prev==="dark"?"light":"dark";
-    try { localStorage.setItem("coats-theme", next); } catch {}
+    try { localStorage.setItem("coats-theme", next); } catch (error) { console.warn("Unable to persist theme preference.", error); }
     return next;
   });
 
   useEffect(() => {
     const token = localStorage.getItem("access");
-    if (!token) { navigate("/login", { replace:true }); return; }
+    if (!token) { window.location.replace("/login"); return; }
     const h = { Authorization:`Bearer ${token}` };
     const base = "http://127.0.0.1:8002/api";
     Promise.all([
@@ -236,7 +243,7 @@ export default function ChainOfCustody() {
                 <div style={{ position:"absolute", width:22, height:22, borderRadius:"50%", background:t.accent, top:"50%", transform:`translateY(-50%) translateX(${isDark?4:36}px)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, transition:"transform .3s cubic-bezier(.34,1.56,.64,1)" }}>{isDark?"🌙":"☀️"}</div>
               </div>
             </div>
-            <button onClick={()=>navigate(`/cases/${id}`)} style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.72rem", fontWeight:600, cursor:"pointer", borderRadius:8, padding:"6px 14px", background:"transparent", border:`1px solid ${t.border}`, color:t.textSecond }}>← Case Detail</button>
+            <button onClick={()=>window.location.assign(`/cases/${id}`)} style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.72rem", fontWeight:600, cursor:"pointer", borderRadius:8, padding:"6px 14px", background:"transparent", border:`1px solid ${t.border}`, color:t.textSecond }}>← Case Detail</button>
           </div>
         </div>
 
