@@ -40,27 +40,35 @@ function OfficerRosterCard({ officers, currentOfficer, t }) {
         👮 All Officers · {officers.length} involved
       </div>
       <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
-        {officers.map((o, i) => {
-          const isCurr = o.username === currentOfficer?.username;
-          const [err, setErr] = useState(false);
-          const displayName = o.first_name ? `${o.first_name} ${o.last_name}`.trim() : o.username;
-          return (
-            <div key={i} style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 12px", borderRadius:30, background:isCurr?`${t.accent}14`:`${t.purple}0a`, border:`1px solid ${isCurr?t.accent+"44":t.border}` }}>
-              <div style={{ width:28, height:28, borderRadius:"50%", overflow:"hidden", background:`${isCurr?t.accent:t.purple}22`, border:`2px solid ${isCurr?t.accent:t.purple}44`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                {o.photo_url && !err
-                  ? <img src={o.photo_url} alt={displayName} onError={()=>setErr(true)} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                  : <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.6rem", fontWeight:700, color:isCurr?t.accent:t.purple }}>{o.username.slice(0,2).toUpperCase()}</span>
-                }
-              </div>
-              <div>
-                <div style={{ fontFamily:"'Sora',sans-serif", fontSize:"0.78rem", fontWeight:600, color:t.textPrimary }}>{displayName}</div>
-                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.58rem", color:t.textMuted }}>
-                  {o.branch}{isCurr && <span style={{ color:t.accent }}> · Current</span>}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {officers.map((officer) => (
+          <OfficerRosterItem
+            key={officer.id ?? officer.username}
+            officer={officer}
+            isCurrent={officer.username === currentOfficer?.username}
+            t={t}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OfficerRosterItem({ officer: o, isCurrent: isCurr, t }) {
+  const [err, setErr] = useState(false);
+  const displayName = o.first_name ? `${o.first_name} ${o.last_name}`.trim() : o.username;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 12px", borderRadius:30, background:isCurr?`${t.accent}14`:`${t.purple}0a`, border:`1px solid ${isCurr?t.accent+"44":t.border}` }}>
+      <div style={{ width:28, height:28, borderRadius:"50%", overflow:"hidden", background:`${isCurr?t.accent:t.purple}22`, border:`2px solid ${isCurr?t.accent:t.purple}44`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        {o.photo_url && !err
+          ? <img src={o.photo_url} alt={displayName} onError={()=>setErr(true)} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+          : <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.6rem", fontWeight:700, color:isCurr?t.accent:t.purple }}>{o.username.slice(0,2).toUpperCase()}</span>
+        }
+      </div>
+      <div>
+        <div style={{ fontFamily:"'Sora',sans-serif", fontSize:"0.78rem", fontWeight:600, color:t.textPrimary }}>{displayName}</div>
+        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.58rem", color:t.textMuted }}>
+          {o.branch}{isCurr && <span style={{ color:t.accent }}> · Current</span>}
+        </div>
       </div>
     </div>
   );
