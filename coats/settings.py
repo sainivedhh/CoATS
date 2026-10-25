@@ -2,7 +2,10 @@ from datetime import timedelta
 from pathlib import Path
 import os
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env", override=False)
 
 
 def env_bool(name, default=False):
@@ -20,11 +23,8 @@ ALLOWED_HOSTS = [
     for host in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
     if host.strip()
 ]
-if not SECRET_KEY and DEBUG:
-    # Keep local development usable, but never use this fallback in production.
-    SECRET_KEY = "django-insecure-local-development-only-change-me"
 if not SECRET_KEY:
-    raise RuntimeError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false.")
+    raise RuntimeError("DJANGO_SECRET_KEY must be set. Copy .env.example to .env and generate a unique key.")
 
 INSTALLED_APPS = [
     'corsheaders',
