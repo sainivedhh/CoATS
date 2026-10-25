@@ -201,7 +201,7 @@ function CaseLogs() {
   const toggleTheme = () => {
     setTheme(prev => {
       const next = prev === "dark" ? "light" : "dark";
-      try { localStorage.setItem("coats-theme", next); } catch {}
+      try { localStorage.setItem("coats-theme", next); } catch (error) { console.warn("Unable to persist theme preference.", error); }
       return next;
     });
   };
