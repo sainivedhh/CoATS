@@ -43,7 +43,7 @@ export default function ProgressUpdate() {
   const t = THEMES[theme];
   const isDark = theme === "dark";
 
-  const toggleTheme = () => setTheme(prev => { const n=prev==="dark"?"light":"dark"; try{localStorage.setItem("coats-theme",n);}catch{} return n; });
+  const toggleTheme = () => setTheme(prev => { const n=prev==="dark"?"light":"dark"; try{localStorage.setItem("coats-theme",n);}catch (error) { console.warn("Unable to persist theme preference.", error); } return n; });
 
   const headers = { Authorization: `Bearer ${token}` };
 
