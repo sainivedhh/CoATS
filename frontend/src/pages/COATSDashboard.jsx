@@ -195,7 +195,11 @@ export default function COATSDashboard() {
   const toggleTheme = useCallback(() => {
     setTheme(prev => {
       const next = prev === "dark" ? "light" : "dark";
-      try { localStorage.setItem("coats-theme", next); } catch {}
+      try {
+        localStorage.setItem("coats-theme", next);
+      } catch (error) {
+        console.warn("Unable to persist theme preference.", error);
+      }
       return next;
     });
   }, []);
@@ -271,7 +275,7 @@ export default function COATSDashboard() {
         setLoading(false);
       }
     }
-  }, [navigate, branchFilter, timelinePreset, customDates, role]);
+  }, [navigate, branchFilter, getTimelineParams, role]);
 
   useEffect(() => {
     loadDashboard();
