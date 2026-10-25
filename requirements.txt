@@ -7,5 +7,6 @@ django-cors-headers
 Pillow
 python-dotenv
 drf-spectacular
+dj-database-url
 scikit-learn
 numpy
