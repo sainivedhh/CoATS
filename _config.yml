@@ -1,0 +1,22 @@
+# GitHub Pages uses Jekyll when publishing from a branch.
+# Exclude dependency trees and generated/runtime files so Jekyll never parses
+# Markdown documentation shipped inside npm packages or local environments.
+exclude:
+  - frontend/node_modules
+  - frontend/dist
+  - frontend/package.json
+  - frontend/package-lock.json
+  - venv
+  - .venv
+  - env
+  - ENV
+  - db.sqlite3
+  - db.sqlite3-journal
+  - media
+  - staticfiles
+  - .env
+  - .github
+  - requirements.txt
+  - manage.py
+  - Dockerfile
+  - docker-compose.yml
